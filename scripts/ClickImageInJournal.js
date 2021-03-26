@@ -90,8 +90,8 @@ async function ChangePopoutImage(url) {
 	if (game.settings.get("journal-to-canvas-slideshow", "displayWindowBehavior") == "newWindow") {
 		//if we would like to display in a new popout window
 		popout = new ImageVideoPopout(url, {shareable: true}).render(true).shareImage();
-		
-		
+
+
 	} else if (game.settings.get("journal-to-canvas-slideshow", "displayWindowBehavior") == "journalEntry") {
 		//if we would like to display in a dedicated journal entry
 		if (!FindDisplayJournal()) {
@@ -104,28 +104,28 @@ async function ChangePopoutImage(url) {
 				//if we have the auto show display settings on, automatically show the journal after the button is clicked
 				displayJournal.render(false, {});
 			//	displayJournal.show("image", true);
-			} 
+			}
 		}
 		var fileTypePattern = /\.[0-9a-z]+$/i;
 		var fileType = url.match(fileTypePattern);
 		let update;
-	
+
 		if (fileType == ".mp4" || fileType == ".webm") {
-			// if the file type is a video 
-			let videoHTML = `<div style="height:100%; display: flex; flex-direction: column; justify-content:center; align-items:center;"> 
+			// if the file type is a video
+			let videoHTML = `<div style="height:100%; display: flex; flex-direction: column; justify-content:center; align-items:center;">
 			<video width="100%" height="auto" autoplay loop>
   				<source src=${url} type="video/mp4">
   				<source src=${url} type="video/webm">
-			</video> 
+			</video>
 			</div>
 			`
-			
+
 			update = {
 				_id: displayJournal._id,
 				content: videoHTML,
 				img: ""
 			}
-		
+
 			const updated = await displayJournal.update(update, {})
 			displayJournal.show("text", true)
 		} else {
@@ -154,7 +154,7 @@ function getImageSource(ev, myCallback) {
 	} else if (type == "VIDEO") {
 		url = element.getElementsByTagName("source")[0].getAttribute("src");
 	} else if (type == "DIV" && element.classList.contains("lightbox-image")) {
-		//https://stackoverflow.com/questions/14013131/how-to-get-background-image-url-of-an-element-using-javascript -- 
+		//https://stackoverflow.com/questions/14013131/how-to-get-background-image-url-of-an-element-using-javascript --
 		//used elements from the above StackOverflow to help me understand how to retrieve the background image url
 		let img = element.style;
 		url = img.backgroundImage.slice(4, -1).replace(/['"]/g, "");
@@ -314,7 +314,7 @@ function createSceneButton(app, html) {
 
 
 async function GenerateDisplayScene() {
-	//create a Display" scene 
+	//create a Display" scene
 	//set the scene to 2000 by 2000, and set the background color to a dark gray
 	if (!DisplaySceneFound()) {
 		displayScene = null;
@@ -324,7 +324,7 @@ async function GenerateDisplayScene() {
 		displayScene = await Scene.create({
 			name: game.settings.get("journal-to-canvas-slideshow", "displayName")
 		});
-		//activate the scene 
+		//activate the scene
 		await displayScene.activate();
 		//update the scene
 		await displayScene.update({
@@ -377,7 +377,7 @@ async function clearDisplayTile() {
 	//clear a tile for the scene
 	var displayTile = FindDisplayTile(game.scenes.active)
 	if (!DisplaySceneFound() && displayTile == undefined) {
-		//if we're not on the display scene and there's no display tile 
+		//if we're not on the display scene and there's no display tile
 		return;
 	}
 	var ourScene
@@ -496,11 +496,11 @@ function ShowWelcomeMessage(){
 			<h2>Journal To Canvas Slideshow Has Updated</h2>
 			<ol style="list-style-type:decimal">
 				<li><a href="https://youtu.be/t4NX55vs9gU">Watch the tutorial video here</a></li><br>
-				<li>Please check the module's settings and reselect your prefered options, as the settings have changed</li><br>	
+				<li>Please check the module's settings and reselect your prefered options, as the settings have changed</li><br>
 				<li>Please recreate your Display Scene, or replace the tile in your display scene with a "Display Tile" (see tutorial video for how-to)</li><br>
 				<li>Please create all Display Tiles from now on using the "Create Display Tile" button under the Tile controls.</li><br>
 				<li>Note that Display Tiles now are "flagged" by the script and no longer need to be the very first tile in the scene, so you can add it after other tiles</li><br>
-			</ol>	
+			</ol>
 		</p>
 		<p>The welcome message can be turned on and off in the module settings, but will be enabled after updates to inform you of important changes.</p>
 		</div> `,
@@ -531,7 +531,7 @@ Hooks.on("getSceneControlButtons", (controls) => {
 			title: 'ClearDisplay',
 			icon: 'far fa-times-circle',
 			onClick: () => {
-				determineWhatToClear(); //clearDisplayTile();	
+				determineWhatToClear(); //clearDisplayTile();
 			},
 			button: true
 		})
@@ -589,9 +589,15 @@ Hooks.on("renderJournalSheet", (app, html, options) => {
 		setEventListeners(html);
 		if (FindDisplayJournal() && app.object == displayJournal) {
 			//find the display journal
-			//the image that will be changed 
+			//the image that will be changed
 			journalImage = html.find(".lightbox-image");
 		}
+
+    // Add the listener for draggable event from the journal image
+    html.find(".lightbox-image").each((i, div) => {
+      div.setAttribute("draggable", "true");
+      div.addEventListener("dragstart", _onDragStart, false);
+    });
 	}
 
 });
@@ -609,6 +615,23 @@ Hooks.once('ready', () => {
 		ShowWelcomeMessage();
 	}
 });
+
+// Add the listener to the board html element
+Hooks.once("canvasReady", (_) => {
+  document.getElementById("board").addEventListener("drop", (event) => {
+    // Try to extract the data (type + src)
+    let data;
+    try {
+      data = JSON.parse(event.dataTransfer.getData("text/plain"));
+    } catch (err) {
+      return;
+    }
+    // Create the tile
+    _onDropImage(event, data);
+  });
+});
+
+
 
 function setUrlImageToShow() {
 	new Dialog({
@@ -714,4 +737,34 @@ async function scaleToBoundingTile(displayTile, boundingTile, tex, url) {
 	imageUpdate.y += (boundingMiddle.y - imageMiddle.y);
 
 	return imageUpdate;
+}
+
+// Grabbing the image url from the journal entry
+function _onDragStart(event) {
+  event.stopPropagation();
+  let url = event.srcElement.style.backgroundImage
+    .slice(4, -1)
+    .replace(/"/g, "");
+  const dragData = { type: "image", src: url };
+  event.dataTransfer.setData("text/plain", JSON.stringify(dragData));
+}
+
+// Create the tile with the gathered informations
+async function _onDropImage(event, data) {
+  if (data.type == "image") {
+    let tileData = {
+      img: data.src
+    };
+
+    // Determine the tile size
+    const tex = await loadTexture(data.src);
+    tileData.width = tex.width;
+    tileData.height = tex.height;
+
+    // Project tile position
+    let t = canvas.tiles.worldTransform;
+    tileData.x = (event.clientX - t.tx) / canvas.stage.scale.x,
+    tileData.y = (event.clientY - t.ty) / canvas.stage.scale.y,
+    Tile.create(tileData);
+  }
 }
